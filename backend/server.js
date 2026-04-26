@@ -10,18 +10,19 @@ dotenv.config();
 connectDB();
 const app = express();
 
-app.use(express.json()); 
+app.use(express.json({ limit: "10kb" }));
 
 app.use("/api/user", userRoutes);
 app.use("/api/chat", chatRoutes);
 app.use("/api/message", messageRoutes);
 
+const allowedOrigin = process.env.FRONTEND_URL || "http://localhost:3000";
 app.use(function (req, res, next) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
   res.header("Access-Control-Allow-Credentials", true);
   res.setHeader(
     "Access-Control-Allow-Headers",
-    "Origin, X-Requested-With, Content-Type, Accept"
+    "Origin, X-Requested-With, Content-Type, Accept, Authorization"
   );
   res.setHeader(
     "Access-Control-Allow-Methods",
@@ -54,7 +55,7 @@ if (process.env.NODE_ENV === "production") {
 app.use(notFound);
 app.use(errorHandler);
 
-const PORT = process.env.PORT;
+const PORT = process.env.PORT || 5000;
 
 const server = app.listen(
   PORT,
@@ -64,29 +65,30 @@ const server = app.listen(
 const io = require("socket.io")(server, {
   pingTimeout: 60000,
   cors: {
-    origin: "http://localhost:3000",
-    // credentials: true,
+    origin: process.env.FRONTEND_URL || "http://localhost:3000",
   },
 });
 
 io.on("connection", (socket) => {
-  console.log("Connected to socket.io");
   socket.on("setup", (userData) => {
     socket.join(userData._id);
     socket.emit("connected");
+
+    socket.on("disconnect", () => {
+      socket.leave(userData._id);
+    });
   });
 
   socket.on("join chat", (room) => {
     socket.join(room);
-    console.log("User Joined Room: " + room);
   });
   socket.on("typing", (room) => socket.in(room).emit("typing"));
   socket.on("stop typing", (room) => socket.in(room).emit("stop typing"));
 
   socket.on("new message", (newMessageReceived) => {
-    var chat = newMessageReceived.chat;
+    const chat = newMessageReceived.chat;
 
-    if (!chat.users) return console.log("chat.users not defined");
+    if (!chat.users) return;
 
     chat.users.forEach((user) => {
       if (user._id === newMessageReceived.sender._id) return;
@@ -95,8 +97,4 @@ io.on("connection", (socket) => {
     });
   });
 
-  socket.off("setup", () => {
-    console.log("USER DISCONNECTED");
-    socket.leave(userData._id);
-  });
 });

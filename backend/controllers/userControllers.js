@@ -1,7 +1,5 @@
 const asyncHandler = require("express-async-handler");
 const User = require("../models/userModel");
-
-const res = require("express/lib/response");
 const generateToken = require("../config/generateToken");
 
 const registerUser = asyncHandler(async (req, res) => {
@@ -16,7 +14,7 @@ const registerUser = asyncHandler(async (req, res) => {
 
   if (userExists) {
     res.status(400);
-    throw new error("User already exists");
+    throw new Error("User already exists");
   }
 
   const user = await User.create({
@@ -36,7 +34,7 @@ const registerUser = asyncHandler(async (req, res) => {
     });
   } else {
     res.status(400);
-    throw new error("Failed to create the User");
+    throw new Error("Failed to create the User");
   }
 });
 
@@ -60,11 +58,14 @@ const authUser = asyncHandler(async (req, res) => {
 });
 
 const allUsers = asyncHandler(async (req, res) => {
-  const keyword = req.query.search
+  const escaped = req.query.search
+    ? req.query.search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+    : null;
+  const keyword = escaped
     ? {
         $or: [
-          { name: { $regex: req.query.search, $options: "i" } },
-          { email: { $regex: req.query.search, $options: "i" } },
+          { name: { $regex: escaped, $options: "i" } },
+          { email: { $regex: escaped, $options: "i" } },
         ],
       }
     : {};

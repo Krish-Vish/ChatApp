@@ -8,7 +8,7 @@ import {
   Text,
   useToast,
 } from "@chakra-ui/react";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { ChatState } from "../Context/ChatProvider";
 import { getSender, getSenderFull } from "../config/ChatLogics";
 import ProfileModal from "./miscellaneous/ProfileModal";
@@ -19,13 +19,13 @@ import ScrollableChat from "./ScrollableChat";
 
 import io from "socket.io-client";
 
-const ENDPOINT = "https://chit-chat-pm11.herokuapp.com/";
-var socket, selectedChatCompare;
+const ENDPOINT = process.env.REACT_APP_SOCKET_ENDPOINT || "http://localhost:5000";
+let socket, selectedChatCompare;
 
 const SingleChat = ({ fetchAgain, setFetchAgain }) => {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [newMessage, setNewMessage] = useState();
+  const [newMessage, setNewMessage] = useState("");
   const [socketConnected, setSocketConnected] = useState(false);
 
   const { user, selectedChat, setSelectedChat, notification, setNotification } =
@@ -35,7 +35,7 @@ const SingleChat = ({ fetchAgain, setFetchAgain }) => {
 
   const toast = useToast();
 
-  const fetchMessages = async () => {
+  const fetchMessages = useCallback(async () => {
     if (!selectedChat) return;
 
     try {
@@ -52,15 +52,12 @@ const SingleChat = ({ fetchAgain, setFetchAgain }) => {
         config
       );
 
-      //console.log(messages);
-
       setMessages(data);
       setLoading(false);
-
       socket.emit("join chat", selectedChat._id);
     } catch (error) {
       toast({
-        title: "Error Occured !",
+        title: "Error Occurred!",
         description: "Failed to Load the messages",
         status: "error",
         duration: 5000,
@@ -68,7 +65,7 @@ const SingleChat = ({ fetchAgain, setFetchAgain }) => {
         position: "bottom",
       });
     }
-  };
+  }, [selectedChat, user, toast]);
 
   useEffect(() => {
     socket = io(ENDPOINT);
@@ -77,14 +74,16 @@ const SingleChat = ({ fetchAgain, setFetchAgain }) => {
     socket.on("typing", () => setIsTyping(true));
     socket.on("stop typing", () => setIsTyping(false));
 
-    // eslint-disable-next-line
-  }, []);
+    return () => {
+      socket.disconnect();
+    };
+  }, [user]);
 
   useEffect(() => {
     fetchMessages();
 
     selectedChatCompare = selectedChat;
-  }, [selectedChat]);
+  }, [selectedChat, fetchMessages]);
 
   useEffect(() => {
     socket.on("message received", (newMessageReceived) => {
@@ -101,10 +100,13 @@ const SingleChat = ({ fetchAgain, setFetchAgain }) => {
         setMessages([...messages, newMessageReceived]);
       }
     });
-  });
+
+    return () => {
+      socket.off("message received");
+    };
+  }, [messages, notification, fetchAgain]);
 
   const sendMessage = async (event) => {
-    //socket.emit("stop typing", selectedChat._id);
     if (event.key === "Enter" && newMessage) {
       try {
         const config = {
@@ -123,13 +125,12 @@ const SingleChat = ({ fetchAgain, setFetchAgain }) => {
           },
           config
         );
-        //console.log(data);
 
         socket.emit("new message", data);
         setMessages([...messages, data]);
       } catch (error) {
         toast({
-          title: "Error Occured !",
+          title: "Error Occurred!",
           description: "Failed to send the message",
           status: "error",
           duration: 5000,
@@ -149,11 +150,11 @@ const SingleChat = ({ fetchAgain, setFetchAgain }) => {
       setTyping(true);
       socket.emit("typing", selectedChat._id);
     }
-    let lastTypingTime = new Date().getTime();
-    var timerLength = 3000;
+    const lastTypingTime = new Date().getTime();
+    const timerLength = 3000;
     setTimeout(() => {
-      var timeNow = new Date().getTime();
-      var timeDiff = timeNow - lastTypingTime;
+      const timeNow = new Date().getTime();
+      const timeDiff = timeNow - lastTypingTime;
       if (timeDiff >= timerLength && typing) {
         socket.emit("stop typing", selectedChat._id);
         setTyping(false);
@@ -201,7 +202,6 @@ const SingleChat = ({ fetchAgain, setFetchAgain }) => {
             flexDir="column"
             justifyContent="flex-end"
             p={3}
-            //bgGradient="radial(cyan.100 , blue.100, green.50)"
             bg="#E8E8E8"
             w="100%"
             h="100%"

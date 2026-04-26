@@ -6,8 +6,10 @@ const messageModel = mongoose.Schema({
     chat: {type: mongoose.Schema.Types.ObjectId , ref: "Chat"} ,
 
 } , {
-    timestamps: true , 
+    timestamps: true ,
 });
+
+messageModel.index({ chat: 1 });
 
 const Message = mongoose.model("Message" , messageModel);
 

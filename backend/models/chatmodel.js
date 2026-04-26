@@ -24,5 +24,7 @@ const chatModel = mongoose.Schema(
   }
 );
 
+chatModel.index({ users: 1 });
+
 const Chat = mongoose.model("Chat", chatModel);
 module.exports = Chat;
